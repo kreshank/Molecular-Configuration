@@ -278,16 +278,32 @@ Two solvers produce identical geometry. As we can see from below that the config
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.5\textwidth]{N3.png}
-  \caption{Configuration for \(N=3\)}
+  \caption{Configuration for $N=3$}
 \end{figure}
 
 \paragraph{Global optimality and uniqueness.}  
 By symmetry and convexity of the sum of identical pairwise interactions, the equilateral triangle is the configuration that minimizes \(\sum_{i<j}V(\|x_i-x_j\|)\).  There are no other forms of triangles achieving \(E=-3\).  Hence, this minimization is unique (not counting rotation or translation).
 
+\newpage
 % Cnonvegence
 \section{Convergence Analysis}
+\subsection{Gradient Descent}
 
-The theoretical order of convergence of BFGS is Q-superlinear, where it should converge faster than linear in specific conditions. However, the condition for this is that the Hessian is positive definite near the minimzer, 
+In a three atom configuration, we found that globally optimal configurations for N=3 for the gradient descent implementation using line search converges roughly linearly, and in a low numnber of steps. The follows shows the estimated convergence order, where $error_{n}$ is the absolute difference of energy between the $n-1$ and $n$ iterations. 
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.5\textwidth]{./GD_conv_uniform.png}
+  \caption{Convergence for Gradient Descent, N=3}
+\end{figure}
+
+
+\noindent
+These fall in line with our expectations for the performance of Gradient Descent, where it typically has a linear convergence rate (our experimental convergence rate is $\rho=1.03$).
+
+\subsection{BFGS}
+
+The theoretical order of convergence of BFGS is Q-superlinear, where it should converge faster than linear in specific conditions. However, the conditions for this case are rather strong: the Hessian must be positive definite in the neighborhood of the minimzer, the line serach much satisfy the strong Wolfe conditions, and the problem is non-degenerate. 
 
 % Discussion
 \section{Discussion}
