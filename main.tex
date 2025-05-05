@@ -12,6 +12,7 @@
 \usepackage{listings}
 \usepackage{enumitem}
 \usepackage{mathtools}
+\usepackage[final]{pdfpages}
 
 \newcommand{\bvec}[1]{\mathbf{#1}}
 \newcommand{\R}{\mathbb{R}}
@@ -34,7 +35,7 @@
 \begin{document}
 \noindent
 \textsc{\Large Numerical analysis: P2}\\
-Students: Bodong Liu (bl576), Ryan Wu (123123)\\
+Students: Bodong Liu (bl576), Ryan Wu (rw645)\\
 Date: May 3, 2025
 \begin{center}\rule{1\linewidth}{0.5pt}\end{center}
 \section*{Outline}
@@ -135,18 +136,23 @@ We implement the BFGS method in the reduced subspace of dimension $3(N-1)$ by pi
       s^{(k)} = -\,H_k^{-1}\,g^{(k)},
     \]
     where \(H_k^{-1}\in\mathbb R^{3(N-1)\times3(N-1)}\) is our current inverse‑Hessian approximation.
-  \item \textbf{Line search (Armijo backtracking).}  
-    Choose \(\alpha=\alpha_0\) and shrink \(\alpha\leftarrow\beta\,\alpha\) until
+
+\item \textbf{Line search (Strong Wolfe).}
+    Find the step length $\alpha$ along the full‐space direction $P^{(k)}$ by enforcing
     \[
-      E\bigl(X^{(k)} + \alpha\,S^{(k)}\bigr)
-      \;\le\;
-      E\bigl(X^{(k)}\bigr)
-      -c\,\alpha\,\bigl(g^{(k)}\bigr)^\top s^{(k)},
+      E\bigl(X^{(k)} + \alpha\,P^{(k)}\bigr) \le E\bigl(X^{(k)}\bigr) + c_1\,\alpha\,(g^{(k)})^\top s^{(k)}
+      \quad\text{and}\quad
+      \bigl|\nabla E(X^{(k)} + \alpha\,P^{(k)})^\top P^{(k)}\bigr|
+      \le -c_2\,(g^{(k)})^\top s^{(k)},
     \]
-    where \(S^{(k)}\) is \(s^{(k)}\) re‑inserted into the full coordinate vector.  Default parameters: \(\alpha_0=1\), \(\beta=0.5\), \(c=10^{-4}\).
+    with default parameters $c_1=10^{-4}$, $c_2=0.9$.  We use a bracket‐and‐zoom routine to satisfy the Strong Wolfe conditions (Ghosh, 2021; Nocedal \& Wright, 2006).
+
+
+
+
   \item \textbf{Update iterate.}
     \[
-      x^{(k+1)} = x^{(k)} + \alpha\,s^{(k)},
+      x^{(k+1)} = x^{(k)} + \alpha_k\,s^{(k)},
       \quad
       X^{(k+1)} = \text{assemble}(x^{(k+1)}),
       \quad
@@ -161,17 +167,18 @@ We implement the BFGS method in the reduced subspace of dimension $3(N-1)$ by pi
   \item \textbf{BFGS update.}  
     Form
     \[
+      w^{(k)}=\alpha_k s^{(k)},\quad
       y^{(k)} = g^{(k+1)} - g^{(k)},\quad
-      \rho^{(k)} = \frac{1}{(y^{(k)})^\top s^{(k)}}.
+      \rho^{(k)} = \frac{1}{(y^{(k)})^\top w^{(k)}}.
     \]
     \begin{itemize}
-      \item If \((y^{(k)})^\top s^{(k)} < 10^{-8}\), skip update (to avoid a non‑positive or numerically unstable \(\rho\)).
+      \item If \((y^{(k)})^\top w^{(k)} < 10^{-8}\), skip update (to avoid a non‑positive or numerically unstable \(\rho\)).
       \item Otherwise,
         \[
-          V = I - \rho^{(k)}\,s^{(k)} (y^{(k)})^\top,\quad
+          V = I - \rho^{(k)}\,w^{(k)} (y^{(k)})^\top,\quad
           H_{k+1}^{-1}
           = V\,H_k^{-1}\,V^\top
-            + \rho^{(k)}\,s^{(k)} (s^{(k)})^\top.
+            + \rho^{(k)}\,w^{(k)} (w^{(k)})^\top.
         \]
     \end{itemize}
   \item \textbf{Stopping criteria.}
@@ -301,13 +308,22 @@ In a three atom configuration, we found that globally optimal configurations for
 \noindent
 These fall in line with our expectations for the performance of Gradient Descent, where it typically has a linear convergence rate (our experimental convergence rate is $\rho=1.03$).
 
+\newpage
 \subsection{BFGS}
 
-The theoretical order of convergence of BFGS is Q-superlinear, where it should converge faster than linear in specific conditions. However, the conditions for this case are rather strong: the Hessian must be positive definite in the neighborhood of the minimzer, the line serach much satisfy the strong Wolfe conditions, and the problem is non-degenerate. 
+The theoretical order of convergence of BFGS is Q-superlinear, where it should converge faster than linear in specific conditions. However, the conditions for this case are rather strong: the Hessian must be positive definite in the neighborhood of the minimzer, the line searcg must satisfy the strong Wolfe conditions, and the problem is non-degenerate.  
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.5\textwidth]{./BFGS_conv_random.png}
+  \caption{Convergence for BFGS, N=3}
+\end{figure}
+\noindent 
+Here we see that the there is a superlinear convergence rate (faster than linear, but not quite at quadratic) as expected: $\rho>1$ and $\rho<2$. This is the performance that is expected by BFGS, when we enforce the Strong Wolfe Conditions (Armijo + Curvature).
+\newpage
 % Discussion
 \section{Discussion}
-We ran both solvers for greater values of $N$ up to $N=10$ as reported in Table 1. We also included the simulation results from The Cambridge Cluster Database in the last column to have a better look at how good our solvers are. The Cambridge Cluster Database uses a 'basin-hopping' algorithm for $N<110$, which are unbiased global optimization methods (The Cambridge Cluster Database). We can see that our solvers are generally doing great. The biggest discrepancy occurs at $N=10$ with an error of $5.8\%$.
+We ran both solvers for greater values of $N$ up to $N=10$ as reported in Table 1. We also included the simulation results from The Cambridge Cluster Database in the last column to have a better look at how good our solvers are. The Cambridge Cluster Database uses a 'basin-hopping' algorithm for $N<110$, which are unbiased global optimization methods (The Cambridge Cluster Database). We can see that our solvers are generally doing great. The biggest discrepancy occurs at $N=10$ with an error of $5.8\%$. Please refer to page 32 for a visualization of the configurations.
 
 % Table
 \begin{table}[h]
@@ -337,76 +353,78 @@ could become extremely small or even slightly negative when the gradient does no
   \text{if }y^{(k)\top}s^{(k)} \le 10^{-8}, \quad\text{skip the BFGS update.}
 \]
 This simple check prevents dividing by (near) zero, preserves positive‑definiteness of the Hessian estimate, and immediately stops the pathological growth in subsequent iterates—eliminating the NaNs and restoring reliable convergence.  
+\\
 
+\noindent 
+Some of the difficulties in observing larger clusters is that the initializations start with very high energy because of there being a higher chance of points spawning close to each other, and it's possible that they would converge to energy of 0 (by pushing all the atoms extremely far apart from each other). Some other difficulties within this problem include that depending on random initializations, both algorithms may push toward a local minimum with energy 0 because points happened to be initilized along an axis. Some of the measures to reduce this variability was using different initial guesses than uniform random. For example, for most cases, we allowed the initial guess for points to be equally-spaced on the surface of a unit sphere. This produced mostly$^*$ good results for small values of $N$.
 
-\((y^{(k)})^\top s^{(k)} < 10^{-8}\)
-
+\newpage
 % Images of N>4
 \begin{figure}[h]
   \centering
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N4.png}
+    \includegraphics[width=0.4\textwidth]{N4.png}
     \caption{N=4}
     \label{fig:sub1}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N5.png}
+    \includegraphics[width=0.4\textwidth]{N5.png}
     \caption{N=5}
     \label{fig:sub2}
   \end{subfigure}
 
-  \vspace{1em}
+  \vspace{0.5em}
 
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N6_1.png}
+    \includegraphics[width=0.4\textwidth]{N6_1.png}
     \caption{N=6 (GD)}
     \label{fig:sub3}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N6_2.png}
+    \includegraphics[width=0.4\textwidth]{N6_2.png}
     \caption{N=6 (BFGS)}
     \label{fig:sub4}
   \end{subfigure}
 
-  \vspace{1em}
+  \vspace{0.5em}
 
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N7.png}
-    \caption{N=7}
+    \includegraphics[width=0.4\textwidth]{N7.png}
+    \caption{N=7 (GD)}
     \label{fig:sub3}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N8.png}
+    \includegraphics[width=0.4\textwidth]{N7_2.png}
+    \caption{N=7 (BFGS)}
+    \label{fig:sub4}
+  \end{subfigure}
+
+  \vspace{0.5em}
+
+  \begin{subfigure}[b]{0.4\textwidth}
+    \centering
+    \includegraphics[width=0.4\textwidth]{N8.png}
     \caption{N=8}
-    \label{fig:sub4}
-  \end{subfigure}
-
-  \vspace{1em}
-
-  \begin{subfigure}[b]{0.45\textwidth}
-    \centering
-    \includegraphics[width=0.45\textwidth]{N9.png}
-    \caption{N=9}
     \label{fig:sub3}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.45\textwidth}
+  \begin{subfigure}[b]{0.4\textwidth}
     \centering
-    \includegraphics[width=0.45\textwidth]{N10.png}
-    \caption{N=10}
+    \includegraphics[width=0.4\textwidth]{N9.png}
+    \caption{N=9}
     \label{fig:sub4}
   \end{subfigure}
 
-  \caption{Geometries for $N=4,5,6,7,8,9,10$.}
+  \caption{Geometries for $N=4,5,6,7,8,9$.}
   \label{fig:grid}
 \end{figure}
 
@@ -414,7 +432,7 @@ This simple check prevents dividing by (near) zero, preserves positive‑definit
 % Algorithm
 \newpage
 \section{Algorithm Pseudo-code}
-We referenced the textbook for help with generating the pseudo algorithm (Ascher et al., 2011).
+We referenced the textbook for help with generating the pseudo algorithm (Ascher et al., 2011). We also referenced two external references for implementing Strong Wolfe Condition in Algorithm 2 (Ghosh, 2021; Nocedal \& Wright, 2006).
 \begin{algorithm}[H]
 \caption{Gradient Descent}
 \begin{algorithmic}[1]
@@ -443,17 +461,18 @@ We referenced the textbook for help with generating the pseudo algorithm (Ascher
     \State break \Comment{gradient‑norm guard}
   \EndIf
   \State $s^{(k)} \gets -H_k^{-1}\,g^{(k)}_{\rm free}$
-  \State Armijo line search to find $\alpha_k$
+  \State Strong Wolfe Condition line search to find $\alpha_k$
   \State $x^{(k+1)} \gets x^{(k)} + \alpha_k\,s^{(k)}$
   \State assemble $X^{(k+1)}$ from free $x^{(k+1)}$, reenable gradient tracking
   \State compute $g^{(k+1)}_{\rm free}$
   \State $y^{(k)} \gets g^{(k+1)}_{\rm free} - g^{(k)}_{\rm free}$
-  \If{$(y^{(k)})^T s^{(k)} < 10^{-8}$}
+  \State $w^{(k)}\leftarrow \alpha_k s^{(k)}$
+  \If{$(y^{(k)})^T w^{(k)} < 10^{-8}$}
     \State skip BFGS update
   \Else
-    \State $\rho = 1 / ((y^{(k)})^T s^{(k)})$
-    \State $V = I - \rho\,s^{(k)}(y^{(k)})^T$
-    \State $H_{k+1}^{-1} = V\,H_k^{-1}\,V^T + \rho\,s^{(k)}(s^{(k)})^T$
+    \State $\rho = 1 / ((y^{(k)})^T w^{(k)})$
+    \State $V = I - \rho\,w^{(k)}(y^{(k)})^T$
+    \State $H_{k+1}^{-1} = V\,H_k^{-1}\,V^T + \rho\,w^{(k)}(w^{(k)})^T$
   \EndIf
   \State $\Delta E = |E(X^{(k+1)}) - E(X^{(k)})|$
   \If{$\Delta E \le \epsilon_E$}
@@ -465,9 +484,21 @@ We referenced the textbook for help with generating the pseudo algorithm (Ascher
 
 \newpage
 \section{References}
-The Cambridge Cluster Database, D. J. Wales, J. P. K. Doye, A. Dullweber, M. P. Hodges, F. Y. Naumkin F. Calvo, J. Hernández-Rojas and T. F. Middleton, URL http://www-wales.ch.cam.ac.uk/CCD.html.\\
 
+\begin{enumerate}
+\item
+The Cambridge Cluster Database. D. J. Wales, J. P. K. Doye, A. Dullweber, M. P. Hodges, F. Y. Naumkin F. Calvo, J. Hernández-Rojas and T. F. Middleton, URL http://www-wales.ch.cam.ac.uk/CCD.html.
+
+\item
+Ghosh, I. (2021, July 29). Introduction to mathematical optimization. Chapter 4 Line Search Descent Methods. https://indrag49.github.io/Numerical-Optimization/line-search-descent-methods.html 
+
+\item
+Nocedal, J., \& Wright, S. J. (2006). Numerical optimization. Springer Science+Business Media, LLC.: Springer e-books.
+
+\item
 Ascher, U. M., \& Greif, C. (2011). A first course in numerical methods. SIAM, Society for Industrial and Applied Mathematics. 
+\end{enumerate}
 
+\includepdf[pages=-,pagecommand={},width=\textwidth]{code.pdf}
 
 \end{document}
